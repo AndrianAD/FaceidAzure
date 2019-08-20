@@ -63,9 +63,9 @@ class MainActivity : AppCompatActivity() {
 
         addPerson.setOnClickListener {
             requestPermissionsCamera()
-//            GlobalScope.launch {
-//                addPersonToGroup(personGroupId, "Andrii", currentPhotoPath)
-//            }
+            GlobalScope.launch {
+                addPersonToGroup(personGroupId, "Andrii", currentPhotoPath)
+            }
         }
 
 
@@ -98,7 +98,7 @@ class MainActivity : AppCompatActivity() {
 
         indentify.setOnClickListener {
             if (faceDetected!!.isNotEmpty()) {
-                val faceIds = arrayOfNulls<UUID>(faceDetected!!.size)
+                val faceIds = arrayOf<UUID>()
                     IdentifyTask().execute(*faceIds)
             }
         }
@@ -174,9 +174,9 @@ class MainActivity : AppCompatActivity() {
 
         if (requestCode == REQUEST_CODE_CAMERA && resultCode == Activity.RESULT_OK) {
             imageView.setImageURI(Uri.fromFile(File(currentPhotoPath)))
-            GlobalScope.launch {
-                addPersonToGroup(personGroupId, "Andrii", currentPhotoPath)
-            }
+//            GlobalScope.launch {
+//                addPersonToGroup(personGroupId, "Andrii", currentPhotoPath)
+//            }
         }
         super.onActivityResult(requestCode, resultCode, data)
     }
@@ -320,7 +320,7 @@ class MainActivity : AppCompatActivity() {
 
         private val mDialog = ProgressDialog(this@MainActivity)
 
-        override fun doInBackground(vararg params: UUID): Array<IdentifyResult>? {
+        override fun doInBackground( params: Array<UUID>): Array<IdentifyResult>? {
 
             try {
                 publishProgress("Getting person group status...")
@@ -334,7 +334,9 @@ class MainActivity : AppCompatActivity() {
                 publishProgress("Identifying...")
                 Log.d("test_test", "Identifying...")
 
-                var result = faceServiceClient.identity(
+
+
+                var result = faceServiceClient.identityInPersonGroup(
                     personGroupId, // person group id
                     params // face ids
                     , 1
