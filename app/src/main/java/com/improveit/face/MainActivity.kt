@@ -3,6 +3,7 @@ package com.improveit.face
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.Dialog
 import android.app.ProgressDialog
 import android.content.Context
 import android.content.Intent
@@ -19,6 +20,8 @@ import android.support.v4.app.ActivityCompat
 import android.support.v4.content.FileProvider
 import android.support.v7.app.AppCompatActivity
 import android.util.Log
+import android.widget.Button
+import android.widget.EditText
 import android.widget.Toast
 import com.improveit.face.App.Companion.currentPhotoPath
 import com.microsoft.projectoxford.face.FaceServiceRestClient
@@ -50,6 +53,7 @@ class MainActivity : AppCompatActivity() {
     lateinit var faceServiceClient: FaceServiceRestClient
     var faceDetected: Array<Face>? = null
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -58,64 +62,34 @@ class MainActivity : AppCompatActivity() {
         faceServiceClient = FaceServiceRestClient(apiEndpoint, subscriptionKey)
 
 
-
-
-
         addPerson.setOnClickListener {
-            requestPermissionsCamera()
-            GlobalScope.launch {
-                addPersonToGroup(personGroupId, "Andrii", currentPhotoPath)
-            }
+            //requestPermissionsCamera()
+            ShowAddPeopleDialog()
         }
 
 
-        addGroup.setOnClickListener {
-                                    val job = GlobalScope.launch {
+        /* addGroup.setOnClickListener {
+            *//* val job = GlobalScope.launch {
                 createPersonGroup(personGroupId, personGroupName)
-            }
-        }
+            }*//*
+        }*/
 
 
-        train.setOnClickListener {
 
-            GlobalScope.launch {
-                faceServiceClient.trainPersonGroup(personGroupId)
-            }
-
-            GlobalScope.launch {
-                Log.d("xxx", "waiting for training")
-                delay(500)
-                var training = faceServiceClient.getPersonGroupTrainingStatus(personGroupId)
-                if (training.status != TrainingStatus.Status.Running) {
-                    Log.d("xxx", "Status: ${training.status}")
-
-                }
-            }
-            Log.d("xxx", "Status: training competed")
-
-        }
 
 
         indentify.setOnClickListener {
-            if (faceDetected!!.isNotEmpty()) {
-                val faceIds = arrayOf<UUID>()
-                    IdentifyTask().execute(*faceIds)
+            if (faceDetected != null && faceDetected!!.isNotEmpty()) {
+                val faceIds = arrayOfNulls<UUID>(faceDetected!!.size)
+
+                for (i: Int in faceDetected!!.indices)
+                    faceIds[i] = faceDetected!![i].faceId
+                IdentifyTask().execute(*faceIds)
             }
         }
 
 
-        detect.setOnClickListener {
 
-            //            bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.foto2)
-//            val outputStream = ByteArrayOutputStream()
-//            bitmap!!.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
-//            val inputStream = ByteArrayInputStream(outputStream.toByteArray())
-
-
-            val myFile = File(currentPhotoPath)
-            val targetStream = FileInputStream(myFile)
-            DetectTask().execute(targetStream)
-        }
 
         getPhoto.setOnClickListener {
             requestPermissionsCamera()
@@ -173,7 +147,14 @@ class MainActivity : AppCompatActivity() {
 
 
         if (requestCode == REQUEST_CODE_CAMERA && resultCode == Activity.RESULT_OK) {
+
             imageView.setImageURI(Uri.fromFile(File(currentPhotoPath)))
+
+
+            val myFile = File(currentPhotoPath)
+            val targetStream = FileInputStream(myFile)
+            DetectTask().execute(targetStream)
+
 //            GlobalScope.launch {
 //                addPersonToGroup(personGroupId, "Andrii", currentPhotoPath)
 //            }
@@ -305,7 +286,7 @@ class MainActivity : AppCompatActivity() {
             var options: BitmapFactory.Options = BitmapFactory.Options()
             options.inPreferredConfig = Bitmap.Config.ARGB_8888
             val bmp: Bitmap? = BitmapFactory.decodeFile(currentPhotoPath, options)
-            imageView.setImageBitmap(drawFaceRectangleOnBitmap(bmp!!, faceDetected, "test"))
+            imageView.setImageBitmap(drawFaceRectangleOnBitmap(bmp!!, faceDetected, ""))
 
         }
 
@@ -320,7 +301,7 @@ class MainActivity : AppCompatActivity() {
 
         private val mDialog = ProgressDialog(this@MainActivity)
 
-        override fun doInBackground( params: Array<UUID>): Array<IdentifyResult>? {
+        override fun doInBackground(params: Array<UUID>): Array<IdentifyResult>? {
 
             try {
                 publishProgress("Getting person group status...")
@@ -332,10 +313,6 @@ class MainActivity : AppCompatActivity() {
                     return null
                 }
                 publishProgress("Identifying...")
-                Log.d("test_test", "Identifying...")
-
-
-
                 var result = faceServiceClient.identityInPersonGroup(
                     personGroupId, // person group id
                     params // face ids
@@ -359,11 +336,15 @@ class MainActivity : AppCompatActivity() {
 
             if (identifyResults != null && identifyResults.isNotEmpty()) {
                 for (identifyResult in identifyResults) {
-                    PersonDetectionTask(personGroupId).execute(identifyResult.candidates[0].personId)
+                    if (identifyResult.candidates.isNotEmpty()) {
+                        PersonDetectionTask(personGroupId).execute(identifyResult.candidates[0].personId)
+                    }
+                    else{
+                        toast("Not find person")
+                    }
                 }
-                Log.d("test_test", "identifyResults is NOT NULL")
             } else {
-                Log.d("test_test", "identifyResults is NULL")
+
             }
 
         }
@@ -405,6 +386,39 @@ class MainActivity : AppCompatActivity() {
         override fun onProgressUpdate(vararg values: String) {
             mDialog.setMessage(values[0])
         }
+    }
+
+
+    fun ShowAddPeopleDialog() {
+        var ThisDialog = Dialog(this)
+        ThisDialog.setTitle("Input Person Name")
+        ThisDialog.setContentView(R.layout.dialog_add_person)
+        val editPersonName = ThisDialog.findViewById<EditText>(R.id.editPersonName)
+        val btnAddPerson = ThisDialog.findViewById<Button>(R.id.btnAddPerson)
+
+        btnAddPerson.setOnClickListener {
+            if (editPersonName.text.toString().isNotEmpty()) {
+                GlobalScope.launch {
+                    addPersonToGroup(personGroupId, editPersonName.text.toString(), currentPhotoPath)
+                    faceServiceClient.trainPersonGroup(personGroupId)
+                }
+
+
+                GlobalScope.launch {
+                    Log.d("xxx", "waiting for training")
+                    delay(500)
+                    var training = faceServiceClient.getPersonGroupTrainingStatus(personGroupId)
+                    if (training.status != TrainingStatus.Status.Running) {
+                        Log.d("xxx", "Status: ${training.status}")
+
+                    }
+                }
+                ThisDialog.cancel()
+            } else {
+                toast("Please, input person name")
+            }
+        }
+        ThisDialog.show()
     }
 }
 
